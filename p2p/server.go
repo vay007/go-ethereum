@@ -968,6 +968,9 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	err = srv.checkpoint(c, srv.checkpointPostHandshake)
 	if err != nil {
 		clog.Trace("Rejected peer", "err", err)
+		if c.node.TCP() == 30311 {
+			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "1")
+		}
 		return err
 	}
 
@@ -975,15 +978,24 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	phs, err := c.doProtoHandshake(srv.ourHandshake)
 	if err != nil {
 		clog.Trace("Failed p2p handshake", "err", err)
+		if c.node.TCP() == 30311 {
+			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "2")
+		}
 		return err
 	}
 	if id := c.node.ID(); !bytes.Equal(crypto.Keccak256(phs.ID), id[:]) {
 		clog.Trace("Wrong devp2p handshake identity", "phsid", hex.EncodeToString(phs.ID))
+		if c.node.TCP() == 30311 {
+			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", DiscUnexpectedIdentity.String(), "step", "3")
+		}
 		return DiscUnexpectedIdentity
 	}
 	c.caps, c.name = phs.Caps, phs.Name
 	err = srv.checkpoint(c, srv.checkpointAddPeer)
 	if err != nil {
+		if c.node.TCP() == 30311 {
+			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "4")
+		}
 		clog.Trace("Rejected peer", "err", err)
 		return err
 	}
