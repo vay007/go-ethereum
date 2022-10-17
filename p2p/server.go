@@ -769,7 +769,7 @@ running:
 			// A peer disconnected.
 			d := common.PrettyDuration(mclock.Now() - pd.created)
 			delete(peers, pd.ID())
-            srv.log.Info("Removing p2p peer", "peercount", len(peers), "id", pd.ID(), "duration", d, "req", pd.requested, "err", pd.err, "enode", pd.Node().String())
+			srv.log.Info("Removing p2p peer", "peercount", len(peers), "id", pd.ID(), "duration", d, "req", pd.requested, "err", pd.err, "enode", pd.Node().String(), "name", pd.Fullname())
 			srv.dialsched.peerRemoved(pd.rw)
 			if pd.Inbound() {
 				inboundCount--
@@ -964,13 +964,11 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	} else {
 		c.node = nodeFromConn(remotePubkey, c.fd)
 	}
+	srv.log.Info("Discovery p2p peer", "enode", c.node.String())
 	clog := srv.log.New("id", c.node.ID(), "addr", c.fd.RemoteAddr(), "conn", c.flags)
 	err = srv.checkpoint(c, srv.checkpointPostHandshake)
 	if err != nil {
 		clog.Trace("Rejected peer", "err", err)
-		if c.node.TCP() == 30311 {
-			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "1")
-		}
 		return err
 	}
 
@@ -978,24 +976,15 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	phs, err := c.doProtoHandshake(srv.ourHandshake)
 	if err != nil {
 		clog.Trace("Failed p2p handshake", "err", err)
-		if c.node.TCP() == 30311 {
-			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "2")
-		}
 		return err
 	}
 	if id := c.node.ID(); !bytes.Equal(crypto.Keccak256(phs.ID), id[:]) {
 		clog.Trace("Wrong devp2p handshake identity", "phsid", hex.EncodeToString(phs.ID))
-		if c.node.TCP() == 30311 {
-			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", DiscUnexpectedIdentity.String(), "step", "3")
-		}
 		return DiscUnexpectedIdentity
 	}
 	c.caps, c.name = phs.Caps, phs.Name
 	err = srv.checkpoint(c, srv.checkpointAddPeer)
 	if err != nil {
-		if c.node.TCP() == 30311 {
-			srv.log.Info("Discovery p2p peer", "enode", c.node.String(), "err", err, "step", "4")
-		}
 		clog.Trace("Rejected peer", "err", err)
 		return err
 	}
