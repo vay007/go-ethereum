@@ -283,8 +283,11 @@ loop:
 			}
 			task := newDialTask(node, staticDialedConn)
 			d.static[id] = task
-			if d.checkDial(node) == nil {
+			err := d.checkDial(node)
+			if err == nil {
 				d.addToStaticPool(task)
+			} else {
+				d.log.Info("Dialtask check", "ip", node.IP(), "err", err)
 			}
 
 		case node := <-d.remStaticCh:
@@ -487,6 +490,7 @@ func (t *dialTask) run(d *dialScheduler) {
 
 	err := t.dial(d, t.dest)
 	if err != nil {
+		d.log.Info("Dialtask run", "ip", t.dest.IP(), "err", err)
 		// For static nodes, resolve one more time if dialing fails.
 		if _, ok := err.(*dialError); ok && t.flags&staticDialedConn != 0 {
 			if t.resolve(d) {
